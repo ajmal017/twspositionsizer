@@ -1,0 +1,305 @@
+/* Copyright (C) 2013 Interactive Brokers LLC. All rights reserved.  This code is subject to the terms
+ * and conditions of the IB API Non-Commercial License or the IB API Commercial License, as applicable. */
+
+package com.peterflanner.twspositionsizer.ui;
+
+import java.awt.Dimension;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseWheelEvent;
+import java.awt.event.MouseWheelListener;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.InputMismatchException;
+
+import javax.swing.*;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
+
+
+import com.peterflanner.twspositionsizer.ui.components.NewTabbedPanel.INewTab;
+
+import com.ib.controller.*;
+import com.ib.controller.ApiController.IAccountSummaryHandler;
+import com.ib.controller.ApiController.IDisplayGroupHandler;
+import com.ib.controller.ApiController.ITopMktDataHandler;
+import com.ib.controller.ApiController.IContractDetailsHandler;
+import com.peterflanner.twspositionsizer.util.SpringLayoutUtilities;
+
+public class PositionSizerPanel extends JPanel implements INewTab, IAccountSummaryHandler, IDisplayGroupHandler, ITopMktDataHandler, IContractDetailsHandler {
+	private DefaultListModel<String> m_acctList = new DefaultListModel<>();
+	private JList<String> m_accounts = new JList<>( m_acctList);
+	private String m_selAcct = "";
+	private JLabel m_lastUpdated = new JLabel();
+	
+	private JTextField netLiquidationTextField = new JTextField(60);
+	private JTextField currentContractTextField = new JTextField(60);
+	private JTextField currentPriceTextField = new JTextField(60);
+	private JTextField riskTextField = new JTextField(60);
+	private JTextField stopLossTextField = new JTextField(60);
+	private JTextField sharesToBuyTextField = new JTextField(60);
+	
+	private NumberFormat doubleZeroFormat = new DecimalFormat("0.00");
+	private NumberFormat numberFormat = NumberFormat.getInstance();
+	
+	private volatile boolean acctSummaryRequested = false;
+
+	PositionSizerPanel() {
+		m_lastUpdated.setAlignmentX(CENTER_ALIGNMENT);
+		m_accounts.setPreferredSize( new Dimension( 100, 100) );
+		netLiquidationTextField.setEditable(false); netLiquidationTextField.setPreferredSize(new Dimension(100, 10));
+		currentContractTextField.setEditable(false);
+		currentPriceTextField.setEditable(false);
+		sharesToBuyTextField.setEditable(false);
+		
+		JPanel mainPanel = new JPanel(new SpringLayout());
+		mainPanel.setPreferredSize(new Dimension(1000, 100));
+
+		// First Row
+		JLabel netLiquidationLabel = new JLabel("Account Value (Net Liquidation)", SwingConstants.TRAILING);
+		mainPanel.add(netLiquidationLabel);
+		netLiquidationLabel.setLabelFor(netLiquidationTextField);
+		mainPanel.add(netLiquidationTextField);
+		
+		// Second Row
+		JLabel currentContractLabel = new JLabel("Current Contract", SwingConstants.TRAILING);
+		mainPanel.add(currentContractLabel);
+		currentContractLabel.setLabelFor(currentContractTextField);
+		mainPanel.add(currentContractTextField);
+
+		// Third Row
+		JLabel currentPriceLabel = new JLabel("Current Price", SwingConstants.TRAILING);
+		mainPanel.add(currentPriceLabel);
+		currentPriceLabel.setLabelFor(currentPriceTextField);
+		mainPanel.add(currentPriceTextField);
+
+		// Fourth Row
+		// TODO add radio buttons to switch between percent and absolute
+		JLabel riskLabel = new JLabel("Risk (%)", SwingConstants.TRAILING);
+		mainPanel.add(riskLabel);
+		riskLabel.setLabelFor(riskTextField);
+		riskTextField.setText("0.5");
+		mainPanel.add(riskTextField);
+		MouseWheelListener riskMouseWheelListener = new MouseWheelListener() {
+			@Override
+			public void mouseWheelMoved(MouseWheelEvent e) {
+				try {
+					double price = numberFormat.parse(riskTextField.getText()).doubleValue();
+					int increment = -1 * e.getWheelRotation(); // negative up, positive down
+					price = price + increment * 0.1;
+					NumberFormat singleZeroFormat = new DecimalFormat("0.0");
+					riskTextField.setText(singleZeroFormat.format(price));
+				} catch (ParseException pe) {
+					// nothing to do
+				}
+			}
+		};
+		riskLabel.addMouseWheelListener(riskMouseWheelListener);
+		riskTextField.addMouseWheelListener(riskMouseWheelListener);
+
+		// Fifth Row
+		// TODO add radio buttons to switch between relative and absolute
+		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)", SwingConstants.TRAILING);
+		mainPanel.add(stopLossLabel);
+		stopLossLabel.setLabelFor(stopLossTextField);
+		mainPanel.add(stopLossTextField);
+		MouseWheelListener stopLossMouseWheelListener = new MouseWheelListener() {
+			@Override
+			public void mouseWheelMoved(MouseWheelEvent e) {
+				try {
+					double price = numberFormat.parse(stopLossTextField.getText()).doubleValue();
+					int increment = -1 * e.getWheelRotation(); // negative up, positive down
+					price = price + increment * 0.01;
+					stopLossTextField.setText(doubleZeroFormat.format(price));
+				} catch (ParseException pe) {
+					// nothing to do
+				}
+			}
+		};
+		stopLossLabel.addMouseWheelListener(stopLossMouseWheelListener);
+		stopLossTextField.addMouseWheelListener(stopLossMouseWheelListener);
+
+		// Sixth Row
+		JLabel sharesToBuyLabel = new JLabel("Shares to Buy", SwingConstants.TRAILING);
+		mainPanel.add(sharesToBuyLabel);
+		sharesToBuyLabel.setLabelFor(sharesToBuyTextField);
+		mainPanel.add(sharesToBuyTextField);
+
+		JButton refreshButton = new JButton("Refresh");
+		refreshButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				requestData();
+			}
+		});
+		mainPanel.add(refreshButton);
+
+		JButton calculateButton = new JButton("Calculate");
+		calculateButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				calculate();
+			}
+		});
+		mainPanel.add(calculateButton);
+
+		SpringLayoutUtilities.makeCompactGrid(mainPanel, 7, 2, 16, 16, 16, 16);
+		
+		setLayout( new BoxLayout(this, BoxLayout.Y_AXIS) );
+		add(mainPanel);
+		add( m_lastUpdated);
+		
+		m_accounts.addListSelectionListener( new ListSelectionListener() {
+			@Override public void valueChanged(ListSelectionEvent e) {
+				requestData();
+			}
+		});
+	}
+
+	private void calculate() {
+		try {
+            double nlv = doubleZeroFormat.parse(netLiquidationTextField.getText()).doubleValue();
+            double currentPrice = numberFormat.parse(currentPriceTextField.getText()).doubleValue();
+            try {
+                double maxRiskPercent = numberFormat.parse(riskTextField.getText()).doubleValue(); // TODO change this when it becomes an option
+                double stopLoss = numberFormat.parse(stopLossTextField.getText()).doubleValue(); // TODO change this when it becomes an option
+                validateValues(nlv, currentPrice, maxRiskPercent, stopLoss);
+                
+                double maxRiskValue = nlv * maxRiskPercent / 100;
+
+                int sharesToBuy = (int) (maxRiskValue / (currentPrice - stopLoss)); // truncation is fine, this is just an estimate
+                sharesToBuyTextField.setText(String.valueOf(sharesToBuy));
+            } catch (ParseException pe) {
+                MainPanel.INSTANCE.show("Invalid value entered for Risk or Stop Loss.");
+            } catch (InputMismatchException ie) {
+                MainPanel.INSTANCE.show("Invalid input");
+            }
+        } catch (ParseException pe) {
+            MainPanel.INSTANCE.show("Cannot calculate without Net Liquidating Value and Current Price.  Press Refresh to request these values again.");
+        }
+	}
+
+	/** Called when the tab is first visited. */
+	@Override public void activated() {
+		for (String account : MainPanel.INSTANCE.accountList() ) {
+			m_acctList.addElement( account);
+		}
+		
+		if (MainPanel.INSTANCE.accountList().size() == 1) {
+			m_accounts.setSelectedIndex( 0);
+		}
+	}
+	
+	/** Called when the tab is closed by clicking the X. */
+	@Override public void closed() {
+	}
+
+	protected synchronized void requestData() {
+		int i = m_accounts.getSelectedIndex();
+		if (i != -1) {
+			String selAcct = m_acctList.get(i);
+			if (selAcct != null && !selAcct.isEmpty()) {
+				m_selAcct = selAcct;
+				AccountSummaryTag[] tags = {AccountSummaryTag.NetLiquidation};
+				if (!acctSummaryRequested) {
+					MainPanel.INSTANCE.controller().reqAccountSummary("All", tags, this);
+					acctSummaryRequested = true;
+				}
+				MainPanel.INSTANCE.controller().queryDisplayGroups(this);
+			}
+		}
+	}
+
+	@Override
+	public void accountSummary(String account, AccountSummaryTag accountSummaryTag, String value, String currency) {
+		if (account.equals( m_selAcct) ) {
+			if (accountSummaryTag == AccountSummaryTag.NetLiquidation) {
+				netLiquidationTextField.setText(doubleZeroFormat.format(Double.parseDouble(value)));
+				m_lastUpdated.setText("Last Updated: " + new Date());
+			}
+		}
+	}
+
+	@Override
+	public void accountSummaryEnd() {
+
+	}
+	
+	//---------- Display Groups -------
+	@Override
+	public void displayGroupList(int[] groups) {
+		// groups are sorted most used to least used
+		if (groups.length > 0) {
+			// subscribe to the most used group
+			MainPanel.INSTANCE.controller().subscribeToGroupEvents(groups[0], this);
+		}
+	}
+	
+	@Override
+	public void displayGroupUpdated(String contractInfo) {
+		String CONTRACT_INFO_SEPARATOR = "@";
+		String[] split = contractInfo.split(CONTRACT_INFO_SEPARATOR);
+		if (split.length > 0) {
+			int id = Integer.parseInt(split[0]);
+			String exchange = "SMART";
+			if (split.length == 2) {
+				exchange = split[1];
+			}
+			NewContract contract = new NewContract();
+			contract.exchange(exchange);
+			contract.conid(id);
+			MainPanel.INSTANCE.controller().reqTopMktData(contract, "", true, this);
+			MainPanel.INSTANCE.controller().reqContractDetails(contract, this);
+		}
+	}
+
+	// -------------------- Top of Market Data ------------------
+	@Override
+	public void tickPrice(NewTickType tickType, double price, int canAutoExecute) {
+		if (tickType == NewTickType.LAST) {
+			String strPrice = doubleZeroFormat.format(price);
+			currentPriceTextField.setText(strPrice);
+			stopLossTextField.setText(strPrice);
+			m_lastUpdated.setText("Last Updated: " + new Date());
+		}
+	}
+
+	@Override
+	public void tickSize(NewTickType tickType, int size) {
+
+	}
+
+	@Override
+	public void tickString(NewTickType tickType, String value) {
+
+	}
+
+	@Override
+	public void tickSnapshotEnd() {
+
+	}
+
+	@Override
+	public void marketDataType(Types.MktDataType marketDataType) {
+
+	}
+
+	// ------------------- Contract Details -------------------
+	@Override
+	public void contractDetails(ArrayList<NewContractDetails> list) {
+		for (NewContractDetails details : list) {
+			String symbol = details.contract().symbol();
+			currentContractTextField.setText(symbol);
+		}
+	}
+	
+	private void validateValues(double nlv, double currentPrice, double risk, double stopLoss) throws InputMismatchException {
+		// TODO make this more robust, and display meaningful messages
+		if (nlv <= 0 || currentPrice <= 0 || currentPrice >= nlv || risk <= 0 || risk > 100 || stopLoss == currentPrice) {
+			throw new InputMismatchException();
+		}
+	}
+}
