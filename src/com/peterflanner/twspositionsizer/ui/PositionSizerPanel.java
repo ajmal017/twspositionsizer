@@ -3,6 +3,8 @@
 
 package com.peterflanner.twspositionsizer.ui;
 
+import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -15,19 +17,27 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.InputMismatchException;
 
-import javax.swing.*;
+import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-
 import com.peterflanner.twspositionsizer.ui.components.NewTabbedPanel.INewTab;
 
-import com.ib.controller.*;
+import com.ib.controller.AccountSummaryTag;
+import com.ib.controller.NewContract;
+import com.ib.controller.NewContractDetails;
+import com.ib.controller.NewTickType;
+import com.ib.controller.Types;
 import com.ib.controller.ApiController.IAccountSummaryHandler;
 import com.ib.controller.ApiController.IDisplayGroupHandler;
 import com.ib.controller.ApiController.ITopMktDataHandler;
 import com.ib.controller.ApiController.IContractDetailsHandler;
-import com.peterflanner.twspositionsizer.util.SpringLayoutUtilities;
+import com.peterflanner.twspositionsizer.ui.components.VerticalPanel;
 
 public class PositionSizerPanel extends JPanel implements INewTab, IAccountSummaryHandler, IDisplayGroupHandler, ITopMktDataHandler, IContractDetailsHandler {
 	private DefaultListModel<String> m_acctList = new DefaultListModel<>();
@@ -35,12 +45,12 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private String m_selAcct = "";
 	private JLabel m_lastUpdated = new JLabel();
 	
-	private JTextField netLiquidationTextField = new JTextField(60);
-	private JTextField currentContractTextField = new JTextField(60);
-	private JTextField currentPriceTextField = new JTextField(60);
-	private JTextField riskTextField = new JTextField(60);
-	private JTextField stopLossTextField = new JTextField(60);
-	private JTextField sharesToBuyTextField = new JTextField(60);
+	private JTextField netLiquidationTextField = new JTextField(7);
+	private JTextField currentContractTextField = new JTextField(7);
+	private JTextField currentPriceTextField = new JTextField(7);
+	private JTextField riskTextField = new JTextField("0.5",7);
+	private JTextField stopLossTextField = new JTextField(7);
+	private JTextField sharesToBuyTextField = new JTextField(7);
 	
 	private NumberFormat doubleZeroFormat = new DecimalFormat("0.00");
 	private NumberFormat numberFormat = NumberFormat.getInstance();
@@ -48,41 +58,34 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private volatile boolean acctSummaryRequested = false;
 
 	PositionSizerPanel() {
-		m_lastUpdated.setAlignmentX(CENTER_ALIGNMENT);
 		m_accounts.setPreferredSize( new Dimension( 100, 100) );
-		netLiquidationTextField.setEditable(false); netLiquidationTextField.setPreferredSize(new Dimension(100, 10));
+		netLiquidationTextField.setEditable(false);
 		currentContractTextField.setEditable(false);
 		currentPriceTextField.setEditable(false);
 		sharesToBuyTextField.setEditable(false);
-		
-		JPanel mainPanel = new JPanel(new SpringLayout());
-		mainPanel.setPreferredSize(new Dimension(1000, 100));
 
-		// First Row
-		JLabel netLiquidationLabel = new JLabel("Account Value (Net Liquidation)", SwingConstants.TRAILING);
-		mainPanel.add(netLiquidationLabel);
-		netLiquidationLabel.setLabelFor(netLiquidationTextField);
-		mainPanel.add(netLiquidationTextField);
-		
-		// Second Row
-		JLabel currentContractLabel = new JLabel("Current Contract", SwingConstants.TRAILING);
-		mainPanel.add(currentContractLabel);
-		currentContractLabel.setLabelFor(currentContractTextField);
-		mainPanel.add(currentContractTextField);
 
-		// Third Row
-		JLabel currentPriceLabel = new JLabel("Current Price", SwingConstants.TRAILING);
-		mainPanel.add(currentPriceLabel);
-		currentPriceLabel.setLabelFor(currentPriceTextField);
-		mainPanel.add(currentPriceTextField);
+		// TODO add radio buttons to switch between relative and absolute
+		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)");
+		MouseWheelListener stopLossMouseWheelListener = new MouseWheelListener() {
+			@Override
+			public void mouseWheelMoved(MouseWheelEvent e) {
+				try {
+					double price = numberFormat.parse(stopLossTextField.getText()).doubleValue();
+					int increment = -1 * e.getWheelRotation(); // negative up, positive down
+					price = price + increment * 0.01;
+					stopLossTextField.setText(doubleZeroFormat.format(price));
+				} catch (ParseException pe) {
+					// nothing to do
+				}
+			}
+		};
+		stopLossLabel.addMouseWheelListener(stopLossMouseWheelListener);
+		stopLossTextField.addMouseWheelListener(stopLossMouseWheelListener);
 
-		// Fourth Row
+
 		// TODO add radio buttons to switch between percent and absolute
-		JLabel riskLabel = new JLabel("Risk (%)", SwingConstants.TRAILING);
-		mainPanel.add(riskLabel);
-		riskLabel.setLabelFor(riskTextField);
-		riskTextField.setText("0.5");
-		mainPanel.add(riskTextField);
+		JLabel riskLabel = new JLabel("Risk (%)");
 		MouseWheelListener riskMouseWheelListener = new MouseWheelListener() {
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
@@ -100,34 +103,6 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		riskLabel.addMouseWheelListener(riskMouseWheelListener);
 		riskTextField.addMouseWheelListener(riskMouseWheelListener);
 
-		// Fifth Row
-		// TODO add radio buttons to switch between relative and absolute
-		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)", SwingConstants.TRAILING);
-		mainPanel.add(stopLossLabel);
-		stopLossLabel.setLabelFor(stopLossTextField);
-		mainPanel.add(stopLossTextField);
-		MouseWheelListener stopLossMouseWheelListener = new MouseWheelListener() {
-			@Override
-			public void mouseWheelMoved(MouseWheelEvent e) {
-				try {
-					double price = numberFormat.parse(stopLossTextField.getText()).doubleValue();
-					int increment = -1 * e.getWheelRotation(); // negative up, positive down
-					price = price + increment * 0.01;
-					stopLossTextField.setText(doubleZeroFormat.format(price));
-				} catch (ParseException pe) {
-					// nothing to do
-				}
-			}
-		};
-		stopLossLabel.addMouseWheelListener(stopLossMouseWheelListener);
-		stopLossTextField.addMouseWheelListener(stopLossMouseWheelListener);
-
-		// Sixth Row
-		JLabel sharesToBuyLabel = new JLabel("Shares to Buy", SwingConstants.TRAILING);
-		mainPanel.add(sharesToBuyLabel);
-		sharesToBuyLabel.setLabelFor(sharesToBuyTextField);
-		mainPanel.add(sharesToBuyTextField);
-
 		JButton refreshButton = new JButton("Refresh");
 		refreshButton.addActionListener(new ActionListener() {
 			@Override
@@ -135,7 +110,6 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 				requestData();
 			}
 		});
-		mainPanel.add(refreshButton);
 
 		JButton calculateButton = new JButton("Calculate");
 		calculateButton.addActionListener(new ActionListener() {
@@ -144,14 +118,22 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 				calculate();
 			}
 		});
-		mainPanel.add(calculateButton);
+		
+		VerticalPanel mainPanel = new VerticalPanel();
 
-		SpringLayoutUtilities.makeCompactGrid(mainPanel, 7, 2, 16, 16, 16, 16);
-		
-		setLayout( new BoxLayout(this, BoxLayout.Y_AXIS) );
+		mainPanel.add("Net Liquidation", netLiquidationTextField);
+		mainPanel.add("Current Contract", currentContractTextField);
+		mainPanel.add("Current Price", currentPriceTextField);
+		mainPanel.add(new Component[] {riskLabel, riskTextField});
+		mainPanel.add(new Component[] {stopLossLabel, stopLossTextField});
+		mainPanel.add("Shares to Buy", sharesToBuyTextField);
+		mainPanel.add(new Component[] {refreshButton, calculateButton});
+
+		setLayout(new BorderLayout());
+		add(m_lastUpdated, BorderLayout.SOUTH);
 		add(mainPanel);
-		add( m_lastUpdated);
 		
+		// TODO maybe we can just always select the first account or maybe we should add back in account selection
 		m_accounts.addListSelectionListener( new ListSelectionListener() {
 			@Override public void valueChanged(ListSelectionEvent e) {
 				requestData();
@@ -260,11 +242,20 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	@Override
 	public void tickPrice(NewTickType tickType, double price, int canAutoExecute) {
 		if (tickType == NewTickType.LAST) {
-			String strPrice = doubleZeroFormat.format(price);
-			currentPriceTextField.setText(strPrice);
-			stopLossTextField.setText(strPrice);
-			m_lastUpdated.setText("Last Updated: " + new Date());
+			updatePrice(price);
+		} else if (tickType == NewTickType.CLOSE) {
+			// TODO revisit this during market hours
+			if (currentPriceTextField.getText().isEmpty()) {
+				updatePrice(price);
+			}
 		}
+	}
+	
+	private void updatePrice(double price) {
+		String strPrice = doubleZeroFormat.format(price);
+		currentPriceTextField.setText(strPrice);
+		stopLossTextField.setText(strPrice);
+		m_lastUpdated.setText("Last Updated: " + new Date());
 	}
 
 	@Override
