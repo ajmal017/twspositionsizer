@@ -233,6 +233,12 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			NewContract contract = new NewContract();
 			contract.exchange(exchange);
 			contract.conid(id);
+			
+			// before we request the data, we should clear the current price and stop loss fields so it's not confusing
+            // if we don't get anything back for the current contract price
+            currentPriceTextField.setText("");
+            stopLossTextField.setText("");
+            
 			MainPanel.INSTANCE.controller().reqTopMktData(contract, "", true, this);
 			MainPanel.INSTANCE.controller().reqContractDetails(contract, this);
 		}
