@@ -4,7 +4,6 @@
 package com.peterflanner.twspositionsizer.ui;
 
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
@@ -39,6 +38,7 @@ import com.ib.controller.ApiController.IDisplayGroupHandler;
 import com.ib.controller.ApiController.ITopMktDataHandler;
 import com.ib.controller.ApiController.IContractDetailsHandler;
 import com.peterflanner.twspositionsizer.ui.components.VerticalPanel;
+import com.peterflanner.twspositionsizer.util.UIUtils;
 
 public class PositionSizerPanel extends JPanel implements INewTab, IAccountSummaryHandler, IDisplayGroupHandler, ITopMktDataHandler, IContractDetailsHandler {
 	private DefaultListModel<String> m_acctList = new DefaultListModel<>();
@@ -52,6 +52,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private JTextField riskTextField = new JTextField("0.5",7);
 	private JTextField stopLossTextField = new JTextField(7);
 	private JTextField sharesToBuyTextField = new JTextField(7);
+	private JTextField valueOfSharesTextField = new JTextField(7);
 	
 	private NumberFormat doubleZeroFormat = new DecimalFormat("0.00");
 	private NumberFormat numberFormat = NumberFormat.getInstance();
@@ -60,12 +61,9 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 
 	PositionSizerPanel() {
 		m_accounts.setPreferredSize( new Dimension( 100, 100) );
-		currentContractTextField.setEditable(false);
-        currentContractTextField.setEnabled(false);
-        currentContractTextField.setDisabledTextColor(Color.BLACK);
-		sharesToBuyTextField.setEditable(false);
-		sharesToBuyTextField.setEnabled(false);
-		sharesToBuyTextField.setDisabledTextColor(Color.BLACK);
+        UIUtils.disableTextField(currentContractTextField);
+		UIUtils.disableTextField(sharesToBuyTextField);
+		UIUtils.disableTextField(valueOfSharesTextField);
 
 		// TODO add radio buttons to switch between relative and absolute
 		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)");
@@ -129,6 +127,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		mainPanel.add(new Component[] {riskLabel, riskTextField});
 		mainPanel.add(new Component[] {stopLossLabel, stopLossTextField});
 		mainPanel.add("Shares to Buy", sharesToBuyTextField);
+		mainPanel.add("Value of Shares", valueOfSharesTextField);
 		mainPanel.add(new Component[] {refreshButton, calculateButton});
 
 		setLayout(new BorderLayout());
@@ -156,6 +155,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 
                 int sharesToBuy = (int) (maxRiskValue / (currentPrice - stopLoss)); // truncation is fine, this is just an estimate
                 sharesToBuyTextField.setText(String.valueOf(sharesToBuy));
+                valueOfSharesTextField.setText(doubleZeroFormat.format(sharesToBuy * currentPrice));
             } catch (ParseException pe) {
                 MainPanel.INSTANCE.show("Invalid value entered for Risk or Stop Loss.");
             } catch (InputMismatchException ie) {
