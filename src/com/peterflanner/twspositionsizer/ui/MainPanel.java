@@ -37,7 +37,7 @@ public class MainPanel implements IConnectionHandler {
 	private final JFrame m_frame = new JFrame();
 	private final NewTabbedPanel m_tabbedPanel = new NewTabbedPanel(true);
 	private final ConnectionPanel m_connectionPanel = new ConnectionPanel();
-	private final PositionSizerPanel m_acctInfoPanel = new PositionSizerPanel();
+	private final PositionSizerPanel positionSizerPanel = new PositionSizerPanel();
 	private final JTextArea m_msg = new JTextArea();
 
 	// getter methods
@@ -54,7 +54,7 @@ public class MainPanel implements IConnectionHandler {
 	}
 	
 	private void run() {
-		m_tabbedPanel.addTab( "Equities Position Sizer", m_acctInfoPanel);
+		m_tabbedPanel.addTab( "Equities Position Sizer", positionSizerPanel);
 		m_tabbedPanel.addTab( "Connection", m_connectionPanel);
 			
 		m_msg.setEditable( false);
@@ -105,6 +105,7 @@ public class MainPanel implements IConnectionHandler {
 	@Override public void disconnected() {
 		show( "disconnected");
 		m_connectionPanel.m_status.setText( "disconnected");
+		positionSizerPanel.disconnected();
 	}
 
 	@Override public void accountList(ArrayList<String> list) {
@@ -113,7 +114,7 @@ public class MainPanel implements IConnectionHandler {
 		m_acctList.addAll( list);
 		
 		// TODO hack
-		m_acctInfoPanel.activated();
+		positionSizerPanel.activated();
 	}
 
 	@Override public void show( final String str) {

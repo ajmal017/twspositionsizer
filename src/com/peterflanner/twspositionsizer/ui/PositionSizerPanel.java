@@ -177,6 +177,10 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		}
 	}
 	
+	public void disconnected() {
+	    acctSummaryRequested = false;
+    }
+	
 	/** Called when the tab is closed by clicking the X. */
 	@Override public void closed() {
 	}
