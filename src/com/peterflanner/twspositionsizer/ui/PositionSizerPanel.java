@@ -4,6 +4,7 @@
 package com.peterflanner.twspositionsizer.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
@@ -59,11 +60,12 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 
 	PositionSizerPanel() {
 		m_accounts.setPreferredSize( new Dimension( 100, 100) );
-		netLiquidationTextField.setEditable(false);
 		currentContractTextField.setEditable(false);
-		currentPriceTextField.setEditable(false);
+        currentContractTextField.setEnabled(false);
+        currentContractTextField.setDisabledTextColor(Color.BLACK);
 		sharesToBuyTextField.setEditable(false);
-
+		sharesToBuyTextField.setEnabled(false);
+		sharesToBuyTextField.setDisabledTextColor(Color.BLACK);
 
 		// TODO add radio buttons to switch between relative and absolute
 		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)");
