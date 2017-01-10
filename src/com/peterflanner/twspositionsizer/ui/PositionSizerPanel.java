@@ -4,6 +4,7 @@
 package com.peterflanner.twspositionsizer.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
@@ -53,17 +54,22 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private JTextField stopLossTextField = new JTextField(7);
 	private JTextField sharesToBuyTextField = new JTextField(7);
 	private JTextField valueOfSharesTextField = new JTextField(7);
+	private Color originalDisabledBackgroundColor;
 	
 	private NumberFormat doubleZeroFormat = new DecimalFormat("0.00");
 	private NumberFormat numberFormat = NumberFormat.getInstance();
 	
-	private volatile boolean acctSummaryRequested = false;
+	private volatile boolean wasAcctSummaryRequested = false;
+	private double excessLiquidity = -1.0;
+	private double totalCashValue = -1.0;
+	private double buyingPower = -1.0;
 
 	PositionSizerPanel() {
 		m_accounts.setPreferredSize( new Dimension( 100, 100) );
         UIUtils.disableTextField(currentContractTextField);
 		UIUtils.disableTextField(sharesToBuyTextField);
 		UIUtils.disableTextField(valueOfSharesTextField);
+		originalDisabledBackgroundColor = currentContractTextField.getBackground();
 
 		// TODO add radio buttons to switch between relative and absolute
 		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)");
@@ -155,7 +161,26 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 
                 int sharesToBuy = (int) (maxRiskValue / (currentPrice - stopLoss)); // truncation is fine, this is just an estimate
                 sharesToBuyTextField.setText(String.valueOf(sharesToBuy));
-                valueOfSharesTextField.setText(doubleZeroFormat.format(sharesToBuy * currentPrice));
+                double valueOfShares = sharesToBuy * currentPrice;
+                valueOfSharesTextField.setText(doubleZeroFormat.format(valueOfShares));
+                
+                // color code shares to buy and value of shares based on what account values it exceeds
+                if (buyingPower >=0 && valueOfShares > buyingPower) {
+                    sharesToBuyTextField.setBackground(Color.RED);
+                    valueOfSharesTextField.setBackground(Color.RED);
+                } else if (excessLiquidity >= 0 && valueOfShares > excessLiquidity) {
+                    sharesToBuyTextField.setBackground(Color.ORANGE);
+                    valueOfSharesTextField.setBackground(Color.ORANGE);
+                } else if (totalCashValue >= 0 && valueOfShares > totalCashValue) {
+                    sharesToBuyTextField.setBackground(Color.YELLOW);
+                    valueOfSharesTextField.setBackground(Color.YELLOW);
+                } else if (buyingPower >= 0 && excessLiquidity >= 0 && totalCashValue >= 0) {
+                    sharesToBuyTextField.setBackground(Color.GREEN);
+                    valueOfSharesTextField.setBackground(Color.GREEN);
+                } else {
+                    sharesToBuyTextField.setBackground(originalDisabledBackgroundColor);
+                    valueOfSharesTextField.setBackground(originalDisabledBackgroundColor);
+                }
             } catch (ParseException pe) {
                 MainPanel.INSTANCE.show("Invalid value entered for Risk or Stop Loss.");
             } catch (InputMismatchException ie) {
@@ -178,7 +203,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	}
 	
 	public void disconnected() {
-	    acctSummaryRequested = false;
+	    wasAcctSummaryRequested = false;
     }
 	
 	/** Called when the tab is closed by clicking the X. */
@@ -191,10 +216,10 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			String selAcct = m_acctList.get(i);
 			if (selAcct != null && !selAcct.isEmpty()) {
 				m_selAcct = selAcct;
-				AccountSummaryTag[] tags = {AccountSummaryTag.NetLiquidation};
-				if (!acctSummaryRequested) {
+				AccountSummaryTag[] tags = {AccountSummaryTag.NetLiquidation, AccountSummaryTag.ExcessLiquidity, AccountSummaryTag.TotalCashValue, AccountSummaryTag.BuyingPower};
+				if (!wasAcctSummaryRequested) {
 					MainPanel.INSTANCE.controller().reqAccountSummary("All", tags, this);
-					acctSummaryRequested = true;
+					wasAcctSummaryRequested = true;
 				}
 				MainPanel.INSTANCE.controller().queryDisplayGroups(this);
 			}
@@ -203,11 +228,17 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 
 	@Override
 	public void accountSummary(String account, AccountSummaryTag accountSummaryTag, String value, String currency) {
-		if (account.equals( m_selAcct) ) {
+	    if (account.equals( m_selAcct) ) {
 			if (accountSummaryTag == AccountSummaryTag.NetLiquidation) {
 				netLiquidationTextField.setText(doubleZeroFormat.format(Double.parseDouble(value)));
 				m_lastUpdated.setText("Last Updated: " + new Date());
-			}
+			} else if (accountSummaryTag == AccountSummaryTag.ExcessLiquidity) {
+			    excessLiquidity = Double.parseDouble(value);
+            } else if (accountSummaryTag == AccountSummaryTag.TotalCashValue) {
+			    totalCashValue = Double.parseDouble(value);
+            } else if (accountSummaryTag == AccountSummaryTag.BuyingPower) {
+			    buyingPower = Double.parseDouble(value);
+            }
 		}
 	}
 
