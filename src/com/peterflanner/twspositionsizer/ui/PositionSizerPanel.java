@@ -20,6 +20,7 @@ import java.util.InputMismatchException;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -54,6 +55,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private JTextField stopLossTextField = new JTextField(7);
 	private JTextField sharesToBuyTextField = new JTextField(7);
 	private JTextField valueOfSharesTextField = new JTextField(7);
+	private JCheckBox liveUpdateCheckbox = new JCheckBox();
 	private Color originalDisabledBackgroundColor;
 	
 	private NumberFormat doubleZeroFormat = new DecimalFormat("0.00");
@@ -125,6 +127,13 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			}
 		});
 		
+		liveUpdateCheckbox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                toggleLiveUpdate();
+            }
+        });
+		
 		VerticalPanel mainPanel = new VerticalPanel();
 
 		mainPanel.add("Net Liquidation", netLiquidationTextField);
@@ -135,6 +144,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		mainPanel.add("Shares to Buy", sharesToBuyTextField);
 		mainPanel.add("Value of Shares", valueOfSharesTextField);
 		mainPanel.add(new Component[] {refreshButton, calculateButton});
+		mainPanel.add("Live Update", liveUpdateCheckbox);
 
 		setLayout(new BorderLayout());
 		add(m_lastUpdated, BorderLayout.SOUTH);
@@ -225,6 +235,15 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			}
 		}
 	}
+	
+	private void cancelData() {
+	    MainPanel.INSTANCE.controller().cancelTopMktData(this);
+    }
+	
+	private void toggleLiveUpdate() {
+        cancelData();
+        requestData();
+    }
 
 	@Override
 	public void accountSummary(String account, AccountSummaryTag accountSummaryTag, String value, String currency) {
@@ -276,7 +295,13 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
             currentPriceTextField.setText("");
             stopLossTextField.setText("");
             
-			MainPanel.INSTANCE.controller().reqTopMktData(contract, "", true, this);
+            // if  we're live updating, request a market stream, otherwise just a snapshot
+            if (liveUpdateCheckbox.isSelected()) {
+                cancelData();
+                MainPanel.INSTANCE.controller().reqTopMktData(contract, "", false, this);
+            } else {
+                MainPanel.INSTANCE.controller().reqTopMktData(contract, "", true, this);
+            }
 			MainPanel.INSTANCE.controller().reqContractDetails(contract, this);
 		}
 	}
