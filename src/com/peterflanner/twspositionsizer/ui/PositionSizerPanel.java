@@ -18,12 +18,14 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.InputMismatchException;
 
+import javax.swing.ButtonGroup;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -56,6 +58,10 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private JTextField sharesToBuyTextField = new JTextField(7);
 	private JTextField valueOfSharesTextField = new JTextField(7);
 	private JCheckBox liveUpdateCheckbox = new JCheckBox();
+    
+    private JRadioButton stopLossPercentRadioButton = new JRadioButton("Percent");
+    private JRadioButton stopLossAbsoluteRadioButton = new JRadioButton("Absolute");
+	
 	private Color originalDisabledBackgroundColor;
 	
 	private NumberFormat doubleZeroFormat = new DecimalFormat("0.00");
@@ -73,7 +79,6 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		UIUtils.disableTextField(valueOfSharesTextField);
 		originalDisabledBackgroundColor = currentContractTextField.getBackground();
 
-		// TODO add radio buttons to switch between relative and absolute
 		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)");
 		MouseWheelListener stopLossMouseWheelListener = new MouseWheelListener() {
 			@Override
@@ -90,7 +95,24 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		};
 		stopLossLabel.addMouseWheelListener(stopLossMouseWheelListener);
 		stopLossTextField.addMouseWheelListener(stopLossMouseWheelListener);
-
+        ButtonGroup stopLossRadioButtonGroup = new ButtonGroup();
+		stopLossRadioButtonGroup.add(stopLossPercentRadioButton);
+		stopLossRadioButtonGroup.add(stopLossAbsoluteRadioButton);
+		stopLossAbsoluteRadioButton.setSelected(true);
+		ActionListener slRadioButtonActionListener = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // TODO when we switch this to MVC or similar, we will be smart about the stop loss value
+                // TODO and keep a single value which will be converted to absolute or percent as needed
+                if (stopLossAbsoluteRadioButton.isSelected()) {
+                    stopLossTextField.setText(currentPriceTextField.getText());
+                } else {
+                    stopLossTextField.setText("-1.0");
+                }
+            }
+        };
+		stopLossAbsoluteRadioButton.addActionListener(slRadioButtonActionListener);
+		stopLossPercentRadioButton.addActionListener(slRadioButtonActionListener);
 
 		// TODO add radio buttons to switch between percent and absolute
 		JLabel riskLabel = new JLabel("Risk (%)");
@@ -140,7 +162,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		mainPanel.add("Current Contract", currentContractTextField);
 		mainPanel.add("Current Price", currentPriceTextField);
 		mainPanel.add(new Component[] {riskLabel, riskTextField});
-		mainPanel.add(new Component[] {stopLossLabel, stopLossTextField});
+		mainPanel.add(stopLossLabel, stopLossTextField, stopLossAbsoluteRadioButton, stopLossPercentRadioButton);
 		mainPanel.add("Shares to Buy", sharesToBuyTextField);
 		mainPanel.add("Value of Shares", valueOfSharesTextField);
 		mainPanel.add(new Component[] {refreshButton, calculateButton});
@@ -164,7 +186,10 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
             double currentPrice = numberFormat.parse(currentPriceTextField.getText()).doubleValue();
             try {
                 double maxRiskPercent = numberFormat.parse(riskTextField.getText()).doubleValue(); // TODO change this when it becomes an option
-                double stopLoss = numberFormat.parse(stopLossTextField.getText()).doubleValue(); // TODO change this when it becomes an option
+                double stopLoss = numberFormat.parse(stopLossTextField.getText()).doubleValue();
+                if (stopLossPercentRadioButton.isSelected()) {
+                    stopLoss = ((1 + (stopLoss / 100)) * currentPrice);
+                }
                 validateValues(nlv, currentPrice, maxRiskPercent, stopLoss);
                 
                 double maxRiskValue = nlv * maxRiskPercent / 100;
@@ -293,7 +318,9 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			// before we request the data, we should clear the current price and stop loss fields so it's not confusing
             // if we don't get anything back for the current contract price
             currentPriceTextField.setText("");
-            stopLossTextField.setText("");
+            if (stopLossAbsoluteRadioButton.isSelected()) {
+                stopLossTextField.setText("");
+            }
             
             // if  we're live updating, request a market stream, otherwise just a snapshot
             if (liveUpdateCheckbox.isSelected()) {
@@ -312,7 +339,6 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		if (tickType == NewTickType.LAST) {
 			updatePrice(price);
 		} else if (tickType == NewTickType.CLOSE) {
-			// TODO revisit this during market hours
 			if (currentPriceTextField.getText().isEmpty()) {
 				updatePrice(price);
 			}
@@ -322,7 +348,9 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private void updatePrice(double price) {
 		String strPrice = doubleZeroFormat.format(price);
 		currentPriceTextField.setText(strPrice);
-		stopLossTextField.setText(strPrice);
+		if (stopLossAbsoluteRadioButton.isSelected()) {
+            stopLossTextField.setText(strPrice);
+        }
 		m_lastUpdated.setText("Last Updated: " + new Date());
 	}
 
