@@ -53,7 +53,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private JTextField netLiquidationTextField = new JTextField(7);
 	private JTextField currentContractTextField = new JTextField(7);
 	private JTextField currentPriceTextField = new JTextField(7);
-	private JTextField riskTextField = new JTextField("0.5",7);
+	private JTextField riskTextField = new JTextField("100",7);
 	private JTextField stopLossTextField = new JTextField(7);
 	private JTextField sharesToBuyTextField = new JTextField(7);
 	private JTextField valueOfSharesTextField = new JTextField(7);
@@ -61,6 +61,8 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
     
     private JRadioButton stopLossPercentRadioButton = new JRadioButton("Percent");
     private JRadioButton stopLossAbsoluteRadioButton = new JRadioButton("Absolute");
+    private JRadioButton riskPercentRadioButton = new JRadioButton("Percent");
+    private JRadioButton riskAbsoluteRadioButton = new JRadioButton("Dollars");
 	
 	private Color originalDisabledBackgroundColor;
 	
@@ -115,7 +117,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		stopLossPercentRadioButton.addActionListener(slRadioButtonActionListener);
 
 		// TODO add radio buttons to switch between percent and absolute
-		JLabel riskLabel = new JLabel("Risk (%)");
+		JLabel riskLabel = new JLabel("Risk ($)");
 		MouseWheelListener riskMouseWheelListener = new MouseWheelListener() {
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
@@ -132,6 +134,26 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		};
 		riskLabel.addMouseWheelListener(riskMouseWheelListener);
 		riskTextField.addMouseWheelListener(riskMouseWheelListener);
+        ButtonGroup riskRadioButtonGroup = new ButtonGroup();
+        riskRadioButtonGroup.add(riskPercentRadioButton);
+        riskRadioButtonGroup.add(riskAbsoluteRadioButton);
+        riskAbsoluteRadioButton.setSelected(true);
+        ActionListener riskRadioButtonActionListener = new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // TODO when we switch this to MVC or similar, we will be smart about the risk value
+                // TODO and keep a single value which will be converted to absolute or percent as needed
+                if (riskAbsoluteRadioButton.isSelected()) {
+                    riskTextField.setText("100");
+                    riskLabel.setText("Risk ($)");
+                } else {
+                    riskTextField.setText("0.5");
+                    riskLabel.setText("Risk (%)");
+                }
+            }
+        };
+        riskAbsoluteRadioButton.addActionListener(riskRadioButtonActionListener);
+        riskPercentRadioButton.addActionListener(riskRadioButtonActionListener);
 
 		JButton refreshButton = new JButton("Refresh");
 		refreshButton.addActionListener(new ActionListener() {
@@ -161,7 +183,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		mainPanel.add("Net Liquidation", netLiquidationTextField);
 		mainPanel.add("Current Contract", currentContractTextField);
 		mainPanel.add("Current Price", currentPriceTextField);
-		mainPanel.add(new Component[] {riskLabel, riskTextField});
+		mainPanel.add(riskLabel, riskTextField, riskAbsoluteRadioButton, riskPercentRadioButton);
 		mainPanel.add(stopLossLabel, stopLossTextField, stopLossAbsoluteRadioButton, stopLossPercentRadioButton);
 		mainPanel.add("Shares to Buy", sharesToBuyTextField);
 		mainPanel.add("Value of Shares", valueOfSharesTextField);
@@ -185,14 +207,19 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
             double nlv = doubleZeroFormat.parse(netLiquidationTextField.getText()).doubleValue();
             double currentPrice = numberFormat.parse(currentPriceTextField.getText()).doubleValue();
             try {
-                double maxRiskPercent = numberFormat.parse(riskTextField.getText()).doubleValue(); // TODO change this when it becomes an option
+                // this could be percent of nlv or a dollar value
+                double maxRisk = numberFormat.parse(riskTextField.getText()).doubleValue(); // TODO change this when it becomes an option
+                double maxRiskValue;
+                if (riskPercentRadioButton.isSelected()) {
+                    maxRiskValue = nlv * maxRisk / 100;
+                } else {
+                    maxRiskValue = maxRisk;
+                }
                 double stopLoss = numberFormat.parse(stopLossTextField.getText()).doubleValue();
                 if (stopLossPercentRadioButton.isSelected()) {
                     stopLoss = ((1 + (stopLoss / 100)) * currentPrice);
                 }
-                validateValues(nlv, currentPrice, maxRiskPercent, stopLoss);
-                
-                double maxRiskValue = nlv * maxRiskPercent / 100;
+                //validateValues(nlv, currentPrice, maxRisk, stopLoss);// TODO revisit
 
                 int sharesToBuy = (int) (maxRiskValue / (currentPrice - stopLoss)); // truncation is fine, this is just an estimate
                 sharesToBuyTextField.setText(String.valueOf(sharesToBuy));
