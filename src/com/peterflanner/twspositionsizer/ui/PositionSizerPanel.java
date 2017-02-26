@@ -81,7 +81,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		UIUtils.disableTextField(valueOfSharesTextField);
 		originalDisabledBackgroundColor = currentContractTextField.getBackground();
 
-		JLabel stopLossLabel = new JLabel("Stop Loss (absolute)");
+		JLabel stopLossLabel = new JLabel("Stop Loss (Absolute)");
 		MouseWheelListener stopLossMouseWheelListener = new MouseWheelListener() {
 			@Override
 			public void mouseWheelMoved(MouseWheelEvent e) {
@@ -108,8 +108,10 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
                 // TODO and keep a single value which will be converted to absolute or percent as needed
                 if (stopLossAbsoluteRadioButton.isSelected()) {
                     stopLossTextField.setText(currentPriceTextField.getText());
+                    stopLossLabel.setText("Stop Loss (Absolute)");
                 } else {
                     stopLossTextField.setText("-1.0");
+                    stopLossLabel.setText("Stop Loss (%)");
                 }
             }
         };
