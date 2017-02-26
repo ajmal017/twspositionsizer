@@ -118,7 +118,6 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		stopLossAbsoluteRadioButton.addActionListener(slRadioButtonActionListener);
 		stopLossPercentRadioButton.addActionListener(slRadioButtonActionListener);
 
-		// TODO add radio buttons to switch between percent and absolute
 		JLabel riskLabel = new JLabel("Risk ($)");
 		MouseWheelListener riskMouseWheelListener = new MouseWheelListener() {
 			@Override
