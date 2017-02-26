@@ -209,7 +209,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
             double currentPrice = numberFormat.parse(currentPriceTextField.getText()).doubleValue();
             try {
                 // this could be percent of nlv or a dollar value
-                double maxRisk = numberFormat.parse(riskTextField.getText()).doubleValue(); // TODO change this when it becomes an option
+                double maxRisk = numberFormat.parse(riskTextField.getText()).doubleValue();
                 double maxRiskValue;
                 if (riskPercentRadioButton.isSelected()) {
                     maxRiskValue = nlv * maxRisk / 100;
