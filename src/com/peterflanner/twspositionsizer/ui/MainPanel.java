@@ -12,13 +12,13 @@ import java.util.ArrayList;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
+import com.peterflanner.twspositionsizer.controller.MyApiController;
 import com.peterflanner.twspositionsizer.ui.components.HtmlButton;
 import com.peterflanner.twspositionsizer.ui.components.NewLookAndFeel;
 import com.peterflanner.twspositionsizer.ui.components.NewTabbedPanel;
 import com.peterflanner.twspositionsizer.ui.components.VerticalPanel;
 
 import com.ib.controller.ApiConnection.ILogger;
-import com.ib.controller.ApiController;
 import com.ib.controller.ApiController.IBulletinHandler;
 import com.ib.controller.ApiController.IConnectionHandler;
 import com.ib.controller.ApiController.ITimeHandler;
@@ -32,7 +32,7 @@ public class MainPanel implements IConnectionHandler {
 	private final JTextArea m_outLog = new JTextArea();
 	private final Logger m_inLogger = new Logger( m_inLog);
 	private final Logger m_outLogger = new Logger( m_outLog);
-	private final ApiController m_controller = new ApiController( this, m_inLogger, m_outLogger);
+	private final MyApiController m_controller = new MyApiController( this, m_inLogger, m_outLogger);
 	private final ArrayList<String> m_acctList = new ArrayList<>();
 	private final JFrame m_frame = new JFrame();
 	private final NewTabbedPanel m_tabbedPanel = new NewTabbedPanel(true);
@@ -42,7 +42,7 @@ public class MainPanel implements IConnectionHandler {
 
 	// getter methods
 	public ArrayList<String> accountList() 	{ return m_acctList; }
-	public ApiController controller() 		{ return m_controller; }
+	public MyApiController controller() 		{ return m_controller; }
 
 	public static void main(String[] args) {
 		try {

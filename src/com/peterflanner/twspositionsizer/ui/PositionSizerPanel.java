@@ -5,7 +5,6 @@ package com.peterflanner.twspositionsizer.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -30,6 +29,11 @@ import javax.swing.JTextField;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
+import com.ib.controller.ApiController;
+import com.ib.controller.NewOrder;
+import com.ib.controller.NewOrderState;
+import com.ib.controller.OrderStatus;
+import com.ib.controller.OrderType;
 import com.peterflanner.twspositionsizer.ui.components.NewTabbedPanel.INewTab;
 
 import com.ib.controller.AccountSummaryTag;
@@ -73,6 +77,8 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private double excessLiquidity = -1.0;
 	private double totalCashValue = -1.0;
 	private double buyingPower = -1.0;
+	
+	private NewContract currentContract = null;
 
 	PositionSizerPanel() {
 		m_accounts.setPreferredSize( new Dimension( 100, 100) );
@@ -172,6 +178,14 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			}
 		});
 		
+		JButton orderButton = new JButton("Place Order");
+		orderButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                placeOrderWithCurrentValues();
+            }
+        });
+		
 		liveUpdateCheckbox.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -188,7 +202,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		mainPanel.add(stopLossLabel, stopLossTextField, stopLossAbsoluteRadioButton, stopLossPercentRadioButton);
 		mainPanel.add("Shares to Buy", sharesToBuyTextField);
 		mainPanel.add("Value of Shares", valueOfSharesTextField);
-		mainPanel.add(new Component[] {refreshButton, calculateButton});
+		mainPanel.add(refreshButton, calculateButton, orderButton);
 		mainPanel.add("Live Update", liveUpdateCheckbox);
 
 		setLayout(new BorderLayout());
@@ -253,6 +267,62 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
             MainPanel.INSTANCE.show("Cannot calculate without Net Liquidating Value and Current Price.  Press Refresh to request these values again.");
         }
 	}
+	
+	static class OrderHandler implements ApiController.IOrderHandler {
+        @Override
+        public void orderState(NewOrderState orderState) {
+            MainPanel.INSTANCE.show(orderState.toString());
+        }
+
+        @Override
+        public void orderStatus(OrderStatus status, int filled, int remaining, double avgFillPrice, long permId, int parentId, double lastFillPrice, int clientId, String whyHeld) {
+            MainPanel.INSTANCE.show(status.toString());
+//            if (status == OrderStatus.Submitted || status == OrderStatus.ApiPending || status == OrderStatus.Filled ||
+//                    status == OrderStatus.PendingSubmit) {
+//                // TODO checkbox for attach stop loss
+//                NewOrder order = new NewOrder();
+//                order.orderType(OrderType.STP);
+//                order.totalQuantity(filled + remaining);
+//                order.parentId(parentId);
+//            }
+        }
+
+        @Override
+        public void handle(int errorCode, String errorMsg) {
+            MainPanel.INSTANCE.show("errorCode = " + errorCode + "and errorMsg = " + errorMsg);
+        }
+    }
+	
+	private void placeOrderWithCurrentValues() {
+	    try {
+	        int parentId = MainPanel.INSTANCE.controller().getNextValidId();
+	        int totalQuantity = Integer.parseInt(sharesToBuyTextField.getText());
+	        
+            NewOrder order = new NewOrder();
+            order.orderId(parentId);
+            order.action(Types.Action.BUY);
+            order.orderType(OrderType.LMT);
+            order.lmtPrice(numberFormat.parse(currentPriceTextField.getText()).doubleValue());
+            order.totalQuantity(totalQuantity);
+            order.transmit(false);
+            
+            NewOrder stopLoss = new NewOrder();
+            stopLoss.orderId(parentId + 1);
+            stopLoss.action(Types.Action.SELL);
+            stopLoss.orderType(OrderType.STP);
+            stopLoss.auxPrice(numberFormat.parse(stopLossTextField.getText()).doubleValue());
+            stopLoss.totalQuantity(totalQuantity);
+            stopLoss.parentId(parentId);
+            stopLoss.transmit(true);
+
+            MainPanel.INSTANCE.controller().placeOrModifyOrder(currentContract, order, new OrderHandler());
+            MainPanel.INSTANCE.controller().placeOrModifyOrder(currentContract, stopLoss, new OrderHandler());
+            
+            MainPanel.INSTANCE.controller().nextValidId(parentId + 2);
+        } catch (Exception e) {
+	        MainPanel.INSTANCE.show("Exception while placing order");
+        }
+    }
 
 	/** Called when the tab is first visited. */
 	@Override public void activated() {
@@ -407,6 +477,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	public void contractDetails(ArrayList<NewContractDetails> list) {
 		for (NewContractDetails details : list) {
 			String symbol = details.contract().symbol();
+			currentContract = details.contract();
 			currentContractTextField.setText(symbol);
 		}
 	}
