@@ -74,6 +74,8 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private NumberFormat numberFormat = NumberFormat.getInstance();
 	
 	private volatile boolean wasAcctSummaryRequested = false;
+	// are we refreshing because of a refresh button press?
+	private volatile boolean isRefreshing = false;
 	private double excessLiquidity = -1.0;
 	private double totalCashValue = -1.0;
 	private double buyingPower = -1.0;
@@ -166,6 +168,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		refreshButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				isRefreshing = true;
 				requestData();
 			}
 		});
@@ -416,9 +419,6 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			// before we request the data, we should clear the current price and stop loss fields so it's not confusing
             // if we don't get anything back for the current contract price
             currentPriceTextField.setText("");
-            if (stopLossAbsoluteRadioButton.isSelected()) {
-                stopLossTextField.setText("");
-            }
             
             // if  we're live updating, request a market stream, otherwise just a snapshot
             if (liveUpdateCheckbox.isSelected()) {
@@ -446,10 +446,11 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private void updatePrice(double price) {
 		String strPrice = doubleZeroFormat.format(price);
 		currentPriceTextField.setText(strPrice);
-		if (stopLossAbsoluteRadioButton.isSelected()) {
+		if (stopLossAbsoluteRadioButton.isSelected() && !isRefreshing) {
             stopLossTextField.setText(strPrice);
         }
 		m_lastUpdated.setText("Last Updated: " + new Date());
+		isRefreshing = false;
 	}
 
 	@Override
