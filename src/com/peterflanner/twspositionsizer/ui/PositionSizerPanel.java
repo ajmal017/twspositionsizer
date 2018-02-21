@@ -61,7 +61,8 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	private JTextField stopLossTextField = new JTextField(7);
 	private JTextField sharesToBuyTextField = new JTextField(7);
 	private JTextField valueOfSharesTextField = new JTextField(7);
-	private JCheckBox liveUpdateCheckbox = new JCheckBox();
+	private JCheckBox liveUpdateCheckbox = new JCheckBox("Live Update");
+	private JCheckBox outsideRTHCheckbox = new JCheckBox("Outside RTH");
     
     private JRadioButton stopLossPercentRadioButton = new JRadioButton("Percent");
     private JRadioButton stopLossAbsoluteRadioButton = new JRadioButton("Absolute");
@@ -206,7 +207,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 		mainPanel.add("Shares to Buy", sharesToBuyTextField);
 		mainPanel.add("Value of Shares", valueOfSharesTextField);
 		mainPanel.add(refreshButton, calculateButton, orderButton);
-		mainPanel.add("Live Update", liveUpdateCheckbox);
+		mainPanel.add(-1, liveUpdateCheckbox, outsideRTHCheckbox);
 
 		setLayout(new BorderLayout());
 		add(m_lastUpdated, BorderLayout.SOUTH);
@@ -240,6 +241,9 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
                 //validateValues(nlv, currentPrice, maxRisk, stopLoss);// TODO revisit
 
                 int sharesToBuy = (int) (maxRiskValue / (currentPrice - stopLoss)); // truncation is fine, this is just an estimate
+				if (sharesToBuy > 100) {
+					sharesToBuy = sharesToBuy / 100 * 100; // floor to the nearest 100
+				}
                 sharesToBuyTextField.setText(String.valueOf(sharesToBuy));
                 double valueOfShares = sharesToBuy * currentPrice;
                 valueOfSharesTextField.setText(doubleZeroFormat.format(valueOfShares));
@@ -307,6 +311,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
             order.orderType(OrderType.LMT);
             order.lmtPrice(numberFormat.parse(currentPriceTextField.getText()).doubleValue());
             order.totalQuantity(totalQuantity);
+            order.outsideRth(outsideRTHCheckbox.isSelected());
             order.transmit(false);
             
             NewOrder stopLoss = new NewOrder();
@@ -316,6 +321,7 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
             stopLoss.auxPrice(numberFormat.parse(stopLossTextField.getText()).doubleValue());
             stopLoss.totalQuantity(totalQuantity);
             stopLoss.parentId(parentId);
+			order.outsideRth(outsideRTHCheckbox.isSelected());
             stopLoss.transmit(true);
 
             MainPanel.INSTANCE.controller().placeOrModifyOrder(currentContract, order, new OrderHandler());
@@ -368,7 +374,9 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	
 	private void toggleLiveUpdate() {
         cancelData();
-        requestData();
+        if (liveUpdateCheckbox.isSelected()) {
+			requestData();
+		}
     }
 
 	@Override
@@ -419,6 +427,11 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 			// before we request the data, we should clear the current price and stop loss fields so it's not confusing
             // if we don't get anything back for the current contract price
             currentPriceTextField.setText("");
+            
+//            sharesToBuyTextField.setText("");
+//            valueOfSharesTextField.setText("");
+//            sharesToBuyTextField.setBackground(originalDisabledBackgroundColor);
+//            valueOfSharesTextField.setBackground(originalDisabledBackgroundColor);
             
             // if  we're live updating, request a market stream, otherwise just a snapshot
             if (liveUpdateCheckbox.isSelected()) {
