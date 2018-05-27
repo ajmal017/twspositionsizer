@@ -302,32 +302,40 @@ public class PositionSizerPanel extends JPanel implements INewTab, IAccountSumma
 	
 	private void placeOrderWithCurrentValues() {
 	    try {
-	        int parentId = MainPanel.INSTANCE.controller().getNextValidId();
 	        int totalQuantity = Integer.parseInt(sharesToBuyTextField.getText());
 	        
-            NewOrder order = new NewOrder();
-            order.orderId(parentId);
-            order.action(Types.Action.BUY);
-            order.orderType(OrderType.LMT);
-            order.lmtPrice(numberFormat.parse(currentPriceTextField.getText()).doubleValue());
-            order.totalQuantity(totalQuantity);
-            order.outsideRth(outsideRTHCheckbox.isSelected());
-            order.transmit(false);
-            
-            NewOrder stopLoss = new NewOrder();
-            stopLoss.orderId(parentId + 1);
-            stopLoss.action(Types.Action.SELL);
-            stopLoss.orderType(OrderType.STP);
-            stopLoss.auxPrice(numberFormat.parse(stopLossTextField.getText()).doubleValue());
-            stopLoss.totalQuantity(totalQuantity);
-            stopLoss.parentId(parentId);
-			order.outsideRth(outsideRTHCheckbox.isSelected());
-            stopLoss.transmit(true);
+	        if (totalQuantity != 0) {
+				int parentId = MainPanel.INSTANCE.controller().getNextValidId();
+	        	Types.Action orderAction = totalQuantity > 0 ? Types.Action.BUY : Types.Action.SELL;
+	        	Types.Action stopAction = totalQuantity > 0 ? Types.Action.SELL : Types.Action.BUY;
+	        	totalQuantity = Math.abs(totalQuantity);
 
-            MainPanel.INSTANCE.controller().placeOrModifyOrder(currentContract, order, new OrderHandler());
-            MainPanel.INSTANCE.controller().placeOrModifyOrder(currentContract, stopLoss, new OrderHandler());
-            
-            MainPanel.INSTANCE.controller().nextValidId(parentId + 2);
+				NewOrder order = new NewOrder();
+				order.orderId(parentId);
+				order.action(orderAction);
+				order.orderType(OrderType.LMT);
+				order.lmtPrice(numberFormat.parse(currentPriceTextField.getText()).doubleValue());
+				order.totalQuantity(totalQuantity);
+				order.outsideRth(outsideRTHCheckbox.isSelected());
+				order.transmit(false);
+
+				NewOrder stopLoss = new NewOrder();
+				stopLoss.orderId(parentId + 1);
+				stopLoss.action(stopAction);
+				stopLoss.orderType(OrderType.STP);
+				stopLoss.auxPrice(numberFormat.parse(stopLossTextField.getText()).doubleValue());
+				stopLoss.totalQuantity(totalQuantity);
+				stopLoss.parentId(parentId);
+				order.outsideRth(outsideRTHCheckbox.isSelected());
+				stopLoss.transmit(true);
+
+				MainPanel.INSTANCE.controller().placeOrModifyOrder(currentContract, order, new OrderHandler());
+				MainPanel.INSTANCE.controller().placeOrModifyOrder(currentContract, stopLoss, new OrderHandler());
+
+				MainPanel.INSTANCE.controller().nextValidId(parentId + 2);
+			} else {
+	        	MainPanel.INSTANCE.show("Order quantity was 0. No action taken.");
+			}
         } catch (Exception e) {
 	        MainPanel.INSTANCE.show("Exception while placing order");
         }
